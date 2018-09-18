@@ -1,0 +1,79 @@
+####################################################################
+#### viya-services-stop.yml                                     ####
+####################################################################
+#### Author: SAS Institute Inc.                                 ####
+####################################################################
+#### DISCLAIMER                                                 ####
+####################################################################
+#### This Ansible Playbook is provided as-is, without warranty  ####
+#### of any kind, either express or implied, including, but not ####
+#### limited to, the implied warranties of merchantability,     ####
+#### fitness for a particular purpose, or non-infringement.     ####
+#### SAS Institute shall not be liable whatsoever for any       ####
+#### damages arising out of the use of this documentation and   ####
+#### code, including any direct, indirect, or consequential     ####
+#### damages. SAS Institute reserves the right to alter or      ####
+#### abandon use of this documentation and code at any time.    ####
+#### In addition, SAS Institute will provide no support for the ####
+#### materials contained herein.                                ####
+####################################################################
+---
+- hosts: sas-all
+  become: yes
+  become_user: root
+  gather_facts: false
+  vars_files:
+    - viya-services-vars.yml
+
+  tasks:
+    - name: Check any SAS processes running
+      shell: "{{sasps_cmd}}"
+      register: psflag
+      ignore_errors: true
+      check_mode: no
+      changed_when: false
+
+    - set_fact:
+        deployhostnum: "{{groups['sas-all'] | length }}"
+        check_mode: no
+
+- hosts: sas-all
+  become: yes
+  become_user: root
+  gather_facts: false
+  vars_files:
+    - viya-services-vars.yml
+  tasks:
+
+    - block:
+
+      - name: Find all SAS services
+        shell: "{{list_services_cmd}}"
+        changed_when: false
+        register: service_list_full
+
+      - name: Convert results to ansible variable
+        set_fact:
+          services_list: "{{ service_list_full.stdout_lines }}"
+
+      - name: Find all SAS tenants services
+        shell: "{{list_tenant_services_cmd}}"
+        changed_when: false
+        register: tenants_list_full
+
+      - name: Convert tenants results to ansible variable
+        set_fact:
+          tenants_services_list: "{{ tenants_list_full.stdout_lines }}"
+        when: tenants_list_full.stdout != ""
+        
+      - name: Stop Tenants Microservices
+        shell: /etc/init.d/{{item}} stop
+        with_items:
+          - "{{tenants_services_list}}"
+        when: tenants_services_list is defined
+#        async: 300
+#        poll: 1        
+        
+      any_errors_fatal: true
+      when: psflag.stdout != "" and not ansible_check_mode
+

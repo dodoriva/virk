@@ -114,18 +114,91 @@
         name: sas-viya-httpproxy-default
         state: started
 
+# We do this Before CAS, so they have a bit more time to come up. 
+# Start cache locator before the rest of the microservices
+- hosts: CoreServices
+  become: yes
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  tasks: 
+    - name: "Start that the cache locator service"
+      service:
+        name: sas-viya-cachelocator-default
+        state: started
+
+# Start cache server before the rest of the microservices
+    - name: "Start the cache server service"
+      service:
+        name: sas-viya-cacheserver-default
+        state: started
+
 - hosts: sas-casserver-primary
   become: yes
   become_user: root
   gather_facts: false
   any_errors_fatal: true
-
   tasks:
     - name: Start CAS servers
       service:
         name: sas-viya-cascontroller-default
         state: started
 
+- hosts: elasticsearch
+  become: yes
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Start Elasticsearch servers
+      service:
+        name: sas-viya-svi-elasticsearch-default
+        state: started
+
+# Start backend services for tenants - otherwise some microservices will be in a non-started loop forever
+- hosts: sas-all
+  become: yes
+  become_user: root
+  gather_facts: false
+  vars_files:
+    - viya-services-vars.yml
+  tasks:
+
+    - block:
+
+      - name: Find all SAS tenants services
+        shell: "{{list_tenant_services_cmd}}"
+        changed_when: false
+        register: tenants_list_full
+
+      - name: Convert tenants results to ansible variable
+        set_fact:
+          tenants_services_list: "{{ tenants_list_full.stdout_lines }}"
+        when: tenants_list_full.stdout != ""
+
+      - name: Start Tenants Microservices in parallel
+        shell: /etc/init.d/{{item}} start
+        async: 600
+        poll: 0
+        register: tenants_are_starting
+        with_items:
+          - "{{tenants_services_list}}"
+        when: tenants_services_list is defined
+        
+      - name: 'check on async startup'
+        async_status:
+          jid: "{{ item.ansible_job_id }}"
+        register: job_result
+        until: job_result.finished
+        retries: 50
+        delay: 10
+        with_items:
+          - "{{tenants_are_starting.results}}"
+        when: tenants_services_list is defined  
+        
+      any_errors_fatal: true
+      when: not ansible_check_mode
+ 
 - hosts: consul,rabbitmq,httpproxy,pgpoolc,sasdatasvrc,sas-casserver-primary
   become: yes
   become_user: root

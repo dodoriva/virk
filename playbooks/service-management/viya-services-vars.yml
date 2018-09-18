@@ -32,4 +32,5 @@ enable_stray_cleanup: false  #stray processes cleanup
 sasps_cmd: ps -ef|grep -E '/opt/sas/spre/|/opt/sas/viya/'|grep -v grep|tail -1
 rhel_url_scraping_cmd: 'host=$(hostname -f);cat /etc/httpd/conf.d/proxy.conf|grep ProxyPass|grep -e "/SAS"|awk "{print \$2}"|sort|uniq|sed "s/^/http:\/\/"$host"/"'
 sles_url_scraping_cmd: 'host=$(hostname -f);cat /etc/apache2/conf.d/proxy.conf|grep ProxyPass|grep -e "/SAS"|awk "{print \$2}"|sort|uniq|sed "s/^/http:\/\/"$host"/"'
-list_services_cmd: ls /etc/init.d/sas-viya*|awk -F '/' '{print $NF}'|grep -vE "\-all\-|\-consul\-|\-vault\-|\-httpproxy\-|\-rabbitmq\-|\-sasdatasvrc\-|\-pgpoolc\-|\-cascontroller\-"
+list_services_cmd: ls /etc/init.d/sas-viya*|awk -F '/' '{print $NF}'|grep -vE "\-all\-|\-consul\-|\-vault\-|\-httpproxy\-|\-rabbitmq\-|\-sasdatasvrc\-|\-pgpoolc\-|\-cascontroller\-|\-cachelocator\-|\-cacheserver\-|\-elasticsearch\-"
+list_tenant_services_cmd: find /etc/init.d/ -name sas-\*-all-services ! -name sas-viya-all-services -printf '%f\n'

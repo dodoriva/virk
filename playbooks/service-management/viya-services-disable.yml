@@ -23,8 +23,31 @@
   become_user: root
   gather_facts: False
   any_errors_fatal: true
-
+  vars_files:
+    - viya-services-vars.yml
   tasks:
+    - name: Find all SAS tenants services
+      shell: "{{list_tenant_services_cmd}}"
+      changed_when: false
+      register: tenants_list_full
+
+    - name: Convert tenants results to ansible variable
+      set_fact:
+        tenants_services_list: "{{ tenants_list_full.stdout_lines }}"
+      when: not ansible_check_mode and tenants_list_full.stdout != ""
+
+    - debug:
+        msg: "Tenant services list : {{tenants_services_list}}"
+      when: tenants_services_list is defined
+        
+    - name: Disable SAS Tenants all services from system reboot
+      service:
+        name: "{{item}}"
+        enabled: no
+      with_items:
+        - "{{tenants_services_list}}"
+      when: tenants_services_list is defined  
+
     - name: Disable SAS Viya all services from system reboot
       service:
         name: sas-viya-all-services
