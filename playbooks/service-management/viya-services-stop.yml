@@ -101,6 +101,25 @@
         state: stopped
       when: psflag.stdout != "" and deployhostnum | int != 1
 
+# Stop cache locator & server 
+- hosts: CoreServices
+  become: yes
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  tasks: 
+    - name: "Stop the cache server service"
+      service:
+        name: sas-viya-cacheserver-default
+        state: stopped
+      when: psflag.stdout != "" and deployhostnum | int != 1
+
+    - name: "Stop that the cache locator service"
+      service:
+        name: sas-viya-cachelocator-default
+        state: stopped
+      when: psflag.stdout != "" and deployhostnum | int != 1
+
 - hosts: httpproxy
   become: yes
   become_user: root
